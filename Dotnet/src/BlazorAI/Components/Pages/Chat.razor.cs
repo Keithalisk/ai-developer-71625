@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿using BlazorAI.Plugins;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -87,9 +88,14 @@ public partial class Chat
     private async Task AddPlugins()
     {
         // Challenge 03 - Add Time Plugin
+        kernel.Plugins.AddFromType<TimePlugin>("TimePlugin");
+        // Challenge 03 - Add Geocoding Plugin
+        kernel.Plugins.AddFromObject(new GeocodingPlugin(kernel.Services.GetRequiredService<IHttpClientFactory>(), Configuration), "GeocodingPlugin");
+        // Challenge 03 - Add Weather Plugin
+        //kernel.Plugins.AddFromObject(new WeatherPlugin(kernel.Services.GetRequiredService<HttpClient>()), "WeatherPlugin");
+        kernel.Plugins.AddFromObject(new WeatherPlugin(Http), "WeatherPlugin");
 
         // Challenge 04 - Import OpenAPI Spec
-
 
         // Challenge 04 - Add the MCP Server tools
         /*
