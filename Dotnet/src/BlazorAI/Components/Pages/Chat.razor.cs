@@ -1,4 +1,5 @@
-﻿using BlazorAI.Plugins;
+﻿using Azure.Core.Pipeline;
+using BlazorAI.Plugins;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -18,7 +19,8 @@ public partial class Chat
 {
     private ChatHistory? chatHistory;
     private Kernel? kernel;
-    private IMcpClient? mcpClient;
+    private IMcpClient? mcpMSLearnClient;
+    private IMcpClient? mcpPetStoreClient;
     private OpenAIPromptExecutionSettings openAIPromptExecutionSettings;
 
     [Inject]
@@ -45,9 +47,6 @@ public partial class Chat
         // Challenge 03 and 04 - Services Required
         kernelBuilder.Services.AddHttpClient();
 
-        // Challenge 04 - create an MCP client for the MS Learn Server
-        // Create an MCPClient for the MSLearn server
-
         // Challenge 05 - Register Azure AI Foundry Text Embeddings Generation
 
         // Challenge 05 - Register Search Index
@@ -59,15 +58,30 @@ public partial class Chat
 
         // Challenge 04 - add a client for the MSLearn MCP Server
         /*
-        if (mcpClient != null)
+        if (mcpMSLearnClient != null)
         {
-            await mcpClient.DisposeAsync();
-            mcpClient = null;
+            await mcpMSLearnClient.DisposeAsync();
+            mcpMSLearnClient = null;
         }
-        mcpClient = await McpClientFactory.CreateAsync(new SseClientTransport(new SseClientTransportOptions
+        mcpMSLearnClient = await McpClientFactory.CreateAsync(new SseClientTransport(new SseClientTransportOptions
         {
-            Endpoint = new Uri(Configuration.GetValue<string>("MCP_ENDPOINT") ??
-                               throw new Exception("MCP_ENDPOINT is not set in configuration")),
+            Endpoint = new Uri(Configuration.GetValue<string>("MSLEARN_MCP_ENDPOINT") ??
+                               throw new Exception("MSLEARN_MCP_ENDPOINT is not set in configuration")),
+        }));
+        */
+
+        // Challenge 04 - add a client for the Petstore MCP Server via APIM
+        /*
+        if (mcpPetStoreClient != null)
+        {
+            await mcpPetStoreClient.DisposeAsync();
+            mcpPetStoreClient = null;
+        }
+        mcpPetStoreClient = await McpClientFactory.CreateAsync(new SseClientTransport(new SseClientTransportOptions
+        {
+            Endpoint = new Uri(Configuration.GetValue<string>("PETSTORE_MCP_ENDPOINT") ??
+                               throw new Exception("PETSTORE_MCP_ENDPOINT is not set in configuration")),
+            TransportMode = HttpTransportMode.StreamableHttp,
         }));
         */
 
@@ -96,11 +110,18 @@ public partial class Chat
         kernel.Plugins.AddFromObject(new WeatherPlugin(Http), "WeatherPlugin");
 
         // Challenge 04 - Import OpenAPI Spec
+        await kernel.ImportPluginFromOpenApiAsync(
+            pluginName: "workItems",
+            uri: new Uri(new Uri(Configuration["WORKITEMS_BASE_URL"]!), Configuration["OPEN_API_DOC_ROUTE"]!));
 
         // Challenge 04 - Add the MCP Server tools
         /*
-        var tools = await mcpClient.ListToolsAsync().ConfigureAwait(false);
+        var tools = await mcpMSLearnClient.ListToolsAsync().ConfigureAwait(false);
         kernel.Plugins.AddFromFunctions("MSLearn", tools.Select(aiFunction => aiFunction.AsKernelFunction()));
+        */
+        /*
+        var tools = await mcpPetStoreClient.ListToolsAsync().ConfigureAwait(false);
+        kernel.Plugins.AddFromFunctions("PetStore", tools.Select(aiFunction => aiFunction.AsKernelFunction()));
         */
 
         // Challenge 05 - Add Search Plugin
