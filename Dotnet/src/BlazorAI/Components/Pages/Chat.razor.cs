@@ -1,4 +1,6 @@
-﻿using Azure.Core.Pipeline;
+﻿using Azure;
+using Azure.Core.Pipeline;
+using Azure.Search.Documents.Indexes;
 using BlazorAI.Plugins;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
@@ -21,7 +23,7 @@ public partial class Chat
     private Kernel? kernel;
     private IMcpClient? mcpMSLearnClient;
     private IMcpClient? mcpPetStoreClient;
-    private OpenAIPromptExecutionSettings openAIPromptExecutionSettings;
+    private OpenAIPromptExecutionSettings? openAIPromptExecutionSettings;
 
     [Inject]
     public required IConfiguration Configuration { get; set; }
@@ -47,9 +49,19 @@ public partial class Chat
         // Challenge 03 and 04 - Services Required
         kernelBuilder.Services.AddHttpClient();
 
-        // Challenge 05 - Register Azure AI Foundry Text Embeddings Generation
+        // Challenge 05 - Register Azure OpenAI Text Embeddings Generation
+        kernelBuilder.AddAzureOpenAIEmbeddingGenerator(
+            deploymentName: Configuration["EMBEDDINGS_DEPLOYMODEL"]!, // Name of deployment, e.g. "text-embedding-ada-002".
+            endpoint: Configuration["AOI_ENDPOINT"]!,
+            apiKey: Configuration["AOI_API_KEY"]!
+        );
 
         // Challenge 05 - Register Search Index
+        kernelBuilder.Services.AddSingleton<SearchIndexClient>(
+            sp => new SearchIndexClient(
+                new Uri(Configuration["AI_SEARCH_URL"]!),
+                new AzureKeyCredential(Configuration["AI_SEARCH_KEY"]!)));
+        kernelBuilder.Services.AddAzureAISearchVectorStore();
 
         // Challenge 07 - Add Azure AI Foundry Text To Image
 
@@ -82,6 +94,7 @@ public partial class Chat
             Endpoint = new Uri(Configuration.GetValue<string>("PETSTORE_MCP_ENDPOINT") ??
                                throw new Exception("PETSTORE_MCP_ENDPOINT is not set in configuration")),
             TransportMode = HttpTransportMode.StreamableHttp,
+            ConnectionTimeout = TimeSpan.FromSeconds(30)
         }));
         */
 
@@ -101,6 +114,8 @@ public partial class Chat
 
     private async Task AddPlugins()
     {
+
+        /* Remove this section to reduce tokens when demoing RAG
         // Challenge 03 - Add Time Plugin
         kernel.Plugins.AddFromType<TimePlugin>("TimePlugin");
         // Challenge 03 - Add Geocoding Plugin
@@ -113,7 +128,7 @@ public partial class Chat
         await kernel.ImportPluginFromOpenApiAsync(
             pluginName: "workItems",
             uri: new Uri(new Uri(Configuration["WORKITEMS_BASE_URL"]!), Configuration["OPEN_API_DOC_ROUTE"]!));
-
+        */
         // Challenge 04 - Add the MCP Server tools
         /*
         var tools = await mcpMSLearnClient.ListToolsAsync().ConfigureAwait(false);
@@ -125,6 +140,11 @@ public partial class Chat
         */
 
         // Challenge 05 - Add Search Plugin
+        if (kernel != null)
+        {
+            kernel.Plugins.AddFromType<ContosoSearchPlugin>("ContosoSearchPlugin", kernel.Services);
+        }
+
 
         // Challenge 07 - Text To Image Plugin
 
@@ -132,7 +152,7 @@ public partial class Chat
 
     private async Task SendMessage()
     {
-        if (!string.IsNullOrWhiteSpace(newMessage) && chatHistory != null)
+        if (!string.IsNullOrWhiteSpace(newMessage) && chatHistory != null && kernel != null && openAIPromptExecutionSettings != null)
         {
             // This tells Blazor the UI is going to be updated.
             StateHasChanged();
